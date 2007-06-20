@@ -1,0 +1,23 @@
+###############################################################################
+#      $URL: http://perlcritic.tigris.org/svn/perlcritic/trunk/Test-Perl-Critic-Progressive/t/perlcriticrc $
+#     $Date: 2007-06-16 23:03:15 -0700 (Sat, 16 Jun 2007) $
+#   $Author: thaljef $
+# $Revision: 1646 $
+###############################################################################
+
+severity = 1
+
+#------------------------------------------------------------------------------
+
+[-CodeLayout::RequireTidyCode]
+
+[Documentation::RequirePodSections]
+lib_sections    = NAME|DESCRIPTION|SYNOPSIS|AUTHOR|COPYRIGHT
+script_sections = NAME|DESCRIPTION|SYNOPSIS|AUTHOR|COPYRIGHT
+
+[Miscellanea::RequireRcsKeywords]
+keywords = URL Date Author Revision
+
+[CodeLayout::ProhibitHardTabs]
+allow_leading_tabs = 0
+

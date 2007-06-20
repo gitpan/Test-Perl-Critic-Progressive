@@ -1,0 +1,27 @@
+#######################################################################
+#      $URL: http://perlcritic.tigris.org/svn/perlcritic/trunk/Test-Perl-Critic-Progressive/INSTALL $
+#     $Date: 2007-06-16 23:03:15 -0700 (Sat, 16 Jun 2007) $
+#   $Author: thaljef $
+# $Revision: 1646 $
+########################################################################
+
+INSTALLATION
+
+To install Test::Perl::Critic::Progressive with C<make>, give the 
+following commands at your favorite shell:
+
+  tar -zxf Test-Perl-Critic-Progressive-0.01.tar.gz
+  cd Test-Perl-Critic-Progressive-0.01
+  perl Makefile.PL
+  make
+  make test
+  make install 
+
+Or if you prefer C<Module::Build>, try this:
+
+  tar -zxf Test-Perl-Critic-Progressive-0.01.tar.gz
+  cd Test-Perl-Critic-Progressive-0.01
+  perl Build.pl
+  ./Build
+  ./Build test
+  ./Build install 
