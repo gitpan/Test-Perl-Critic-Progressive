@@ -1,6 +1,6 @@
 ---
 name: Test-Perl-Critic-Progressive
-version: 0.01
+version: 0.02
 author:
   - 'Jeffrey Thalhammer <thaljef@cpan.org>'
 abstract: Use Perl::Critic in test scripts
@@ -16,7 +16,7 @@ build_requires:
 provides:
   Test::Perl::Critic::Progressive:
     file: lib/Test/Perl/Critic/Progressive.pm
-    version: 0.01
+    version: 0.02
 generated_by: Module::Build version 0.2808
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html

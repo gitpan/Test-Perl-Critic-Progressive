@@ -1,9 +1,21 @@
 #######################################################################
 #      $URL: http://perlcritic.tigris.org/svn/perlcritic/trunk/Test-Perl-Critic-Progressive/Changes $
-#     $Date: 2007-06-16 23:03:15 -0700 (Sat, 16 Jun 2007) $
+#     $Date: 2007-06-22 04:26:51 -0700 (Fri, 22 Jun 2007) $
 #   $Author: thaljef $
-# $Revision: 1646 $
+# $Revision: 1698 $
 ########################################################################
+
+[0.02] 2007-06-22
+
+    Added hooks for controling the decay rate for individual types of
+    violations.  See POD for details.
+
+    All functions can now be exported upon request.  Note that some of
+    them have been renamed.
+
+    Tweaked the test diagnostics messages a bit.
+
+    Edited documentation.
 
 [0.01] 2007-06-17
 

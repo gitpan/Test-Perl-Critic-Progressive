@@ -1,8 +1,8 @@
 ##############################################################################
 #      $URL: http://perlcritic.tigris.org/svn/perlcritic/trunk/Test-Perl-Critic-Progressive/lib/Test/Perl/Critic/Progressive.pm $
-#     $Date: 2007-06-17 01:44:03 -0700 (Sun, 17 Jun 2007) $
+#     $Date: 2007-06-22 04:26:51 -0700 (Fri, 22 Jun 2007) $
 #   $Author: thaljef $
-# $Revision: 1649 $
+# $Revision: 1698 $
 ##############################################################################
 
 package Test::Perl::Critic::Progressive;
@@ -17,18 +17,37 @@ use File::Spec qw();
 use FindBin qw($Bin);
 
 use Perl::Critic qw();
-use Perl::Critic::Utils qw( &policy_short_name );
+use Perl::Critic::Utils qw( &policy_short_name &policy_long_name );
 
 use Test::Builder qw();
 
-#---------------------------------------------------------------------------
-
-our $VERSION = 0.01;
+use base 'Exporter';
 
 #---------------------------------------------------------------------------
 
-my $STEP_SIZE = undef;
+our $VERSION = 0.02;
+
+#---------------------------------------------------------------------------
+
+our @EXPORT_OK = qw(
+    get_critic_args
+    get_history_file
+    get_total_step_size
+    get_step_size_per_policy
+    progressive_critic_ok
+    set_critic_args
+    set_history_file
+    set_total_step_size
+    set_step_size_per_policy
+);
+
+our %EXPORT_TAGS = ( all => \@EXPORT_OK );
+
+#---------------------------------------------------------------------------
+
+my $TOTAL_STEP_SIZE = undef;
 my $DEFAULT_STEP_SIZE = 0;
+my %STEP_SIZE_PER_POLICY = ();
 
 my $HISTORY_FILE = undef;
 my $DEFAULT_HISTORY_FILE = File::Spec->catfile($Bin, '.perlcritic-history');
@@ -62,14 +81,65 @@ sub progressive_critic_ok {
 #---------------------------------------------------------------------------
 # Pulbic accessor functions
 
-sub get_history_file { return $HISTORY_FILE || $DEFAULT_HISTORY_FILE; }
-sub set_history_file { return $HISTORY_FILE = shift; }
+sub get_history_file {
+    return defined $HISTORY_FILE ?
+      $HISTORY_FILE : $DEFAULT_HISTORY_FILE;
+}
 
-sub get_step_size { return $STEP_SIZE || $DEFAULT_STEP_SIZE; }
-sub set_step_size { return $STEP_SIZE = shift; }
+#---------------------------------------------------------------------------
 
-sub set_critic_args { return %CRITIC_ARGS = @_; }
-sub get_critic_args { return %CRITIC_ARGS; }
+sub set_history_file {
+    $HISTORY_FILE = shift;
+    return 1;
+}
+
+#---------------------------------------------------------------------------
+
+sub get_critic_args {
+    return %CRITIC_ARGS;
+}
+
+#---------------------------------------------------------------------------
+
+sub set_critic_args {
+    %CRITIC_ARGS = @_;
+    return 1;
+}
+
+#---------------------------------------------------------------------------
+
+sub get_total_step_size {
+    return defined $TOTAL_STEP_SIZE ?
+      $TOTAL_STEP_SIZE : $DEFAULT_STEP_SIZE;
+}
+
+
+#---------------------------------------------------------------------------
+
+sub set_total_step_size {
+    $TOTAL_STEP_SIZE = shift;
+    return 1;
+}
+
+#---------------------------------------------------------------------------
+
+sub get_step_size_per_policy {
+    return %STEP_SIZE_PER_POLICY;
+}
+
+#---------------------------------------------------------------------------
+
+sub set_step_size_per_policy {
+
+    my %args = @_;
+    my %step_sizes = ();
+    for my $policy_name ( keys %args ) {
+        $step_sizes{policy_long_name($policy_name)} = $args{$policy_name};
+    }
+
+    %STEP_SIZE_PER_POLICY = %step_sizes;
+    return 1;
+}
 
 #---------------------------------------------------------------------------
 # Private functions
@@ -84,7 +154,8 @@ sub _evaluate_test {
     my $history_data = _read_history( get_history_file() );
     my $last_critique = $history_data->[-1];
     my $has_run_before = defined $last_critique;
-    my $last_total_violations = undef;
+    my $last_total_violations = 0;
+    my $current_total_violations = 0;
 
 
     for my $policy ( $CRITIC->policies() ) {
@@ -95,16 +166,20 @@ sub _evaluate_test {
 
         my $last_policy_violations = $last_critique->{$policy_name};
         next if not defined $last_policy_violations;
+
         $last_total_violations += $last_policy_violations;
+        $current_total_violations += $policy_violations;
 
-        if ( $policy_violations > $last_policy_violations ) {
+        my $policy_step_size = defined $STEP_SIZE_PER_POLICY{$policy_name} ?
+          $STEP_SIZE_PER_POLICY{$policy_name} : $DEFAULT_STEP_SIZE;
 
+        my $target = $policy_step_size > $last_policy_violations ?
+          0 : $last_policy_violations - $policy_step_size;
+
+        if ( $policy_violations > $target ) {
             my $short_name = policy_short_name($policy_name);
-            my $diagf = '%s violations was %i, now %i.';
-
-            $TEST->diag( sprintf $diagf, $short_name,
-                         $last_policy_violations, $policy_violations );
-
+            my $diagf = '%s: Got %i violation(s).  Expected no more than %i.';
+            $TEST->diag( sprintf $diagf, $short_name, $policy_violations, $target );
             $ok = 0; # Failed the test!
         }
     }
@@ -112,12 +187,15 @@ sub _evaluate_test {
 
 
     if ( $has_run_before ) {
-        my $got = scalar @viols;
-        my $target = $last_total_violations - get_step_size();
-        my $expected = $target < 0 ? 0 : $target;  # Don't go negative
-        if ( $got > $expected ){
-            $TEST->diag('Got too many Perl::Critic violations');
-            $TEST->diag("Got $got violations, but expected no more than $expected.");
+
+        my $target = get_total_step_size() > $last_total_violations ?
+          0 : $last_total_violations - get_total_step_size();
+
+
+        if ( $current_total_violations > $target ) {
+            my $got = $current_total_violations;
+            $TEST->diag('Too many Perl::Critic violations...');
+            $TEST->diag("Got a total of $got. Expected no more than $target.");
             $ok = 0;
         }
     }
@@ -210,23 +288,22 @@ Test::Perl::Critic::Progressive - Gradually enforce coding standards
 
 To test one or more files, and/or all files in one or more directories:
 
-  use Test::Perl::Critic::Progressive;
-  Test::Perl::Critic::Progressive::progressive_critic_ok($file1, $file2, $dir1, $dir2);
+  use Test::Perl::Critic::Progressive qw( progressive_critic_ok );
+  progressive_critic_ok($file1, $file2, $dir1, $dir2);
 
-To test all files in a distribution:
+To test all Perl files in a distribution:
 
-  use Test::Perl::Critic::Progressive;
-  Test::Perl::Critic::Progressive::progressive_critic_ok();
+  use Test::Perl::Critic::Progressive qw( progressive_critic_ok );
+  progressive_critic_ok();
 
 Recommended usage for public CPAN distributions:
 
   use strict;
   use warnings;
-  use English qw(-no_match_vars);
   use Test::More;
 
   eval { require Test::Perl::Critic::Progressive };
-  plan skip_all => 'T::P::C::Progressive required for this test' if $EVAL_ERROR;
+  plan skip_all => 'T::P::C::Progressive required for this test' if $@;
 
   Test::Perl::Critic::Progressive::progressive_critic_ok();
 
@@ -236,8 +313,8 @@ Applying coding standards to large amounts of legacy code is a daunting task.
 Often times, legacy code is so non-compliant that it seems downright
 impossible.  But, if you consistently chip away at the problem, you will
 eventually succeed!  Test::Perl::Critic::Progressive uses the L<Perl::Critic>
-engine to B<gradually> to prevent further deterioration of your code and
-gradually steer it towards conforming with your chosen coding standards.
+engine to prevent further deterioration of your code and
+B<gradually> steer it towards conforming with your chosen coding standards.
 
 The most effective way to use Test::Perl::Critic::Progressive is as a unit
 test that is run under a continuous-integration system like CruiseControl or
@@ -245,11 +322,18 @@ AntHill.  Each time a developer commits changes to the code, this test will
 fail and the build will break unless it has the same (or fewer) Perl::Critic
 violations than the last successful test.
 
+See the L<"NOTES"> for more details about how this test works.
+
 =head1 SUBROUTINES
+
+All of the following subroutines can be exported upon request.  Or you
+can export all of them at once using the C<':all'> tag.
 
 =over 8
 
-=item Test::Perl::Critic::Progressive::progressive_critic_ok(@FILES [, @DIRECTORIES ])
+=item C< progressive_critic_ok(@FILES [, @DIRECTORIES ]) >
+
+=item C< progressive_critic_ok() >
 
 Uses Perl::Critic to analyze each of the given @FILES, and/or all Perl files
 beneath the given list of C<@DIRECTORIES>.  If no arguments are given, it
@@ -263,24 +347,15 @@ run, the test will pass only if the number of violations found B<is less than
 or equal to> the number of violations found during the last passing test.  If
 it does pass, then the history file will be updated with the new analysis
 results.  Once all the violations are removed from the code, this test will
-always pass, a new violation is introduced.
+always pass, unless a new violation is introduced.
 
 This subroutine emits its own L<Test::More> plan, so you do not need to
 specify an expected number of tests yourself.
 
-=back
 
-=head1 CONFIGURATION
+=item C< get_history_file() >
 
-You can use the following functions to configure the behavior of
-Test::Perl::Critic::Progressive.  You should use these before calling
-C<progressive_critic_ok>.  Note that they are B<never> exported.
-
-=over 8
-
-=item Test::Perl::Critic::Progressive::get_history_file();
-
-=item Test::Perl::Critic::Progressive::set_history_file($FILE);
+=item C< set_history_file($FILE) >
 
 These functions get or set the full path to the history file.  This is
 where Test::Perl::Critic::Progressive will store the results of each passing
@@ -288,20 +363,48 @@ analysis.  If the C<$FILE> does not exist, it will be created anew.  The
 default is C<$Bin/.perlcritic-history> where C<$Bin> is the directory that
 the calling test script is located in.
 
-=item Test::Perl::Critic::Progressive::get_step_size();
+=item C< get_total_step_size() >
 
-=item Test::Perl::Critic::Progressive::set_step_size($INTEGER);
+=item C< set_total_step_size($INTEGER) >
 
 These functions get or set the minimum acceptable decrease in the B<total>
 number of violations between each test.  The default value is zero, which
 means that you are not required to remove any violations, but you are also not
 allowed to add any.  If you set the step size to a positive number, the test
 will require you to remove C<$INTEGER> violations each time the test is run.
-Thus, increasing the step size forces you to correct the code faster.
+In this case, the particular type of violation that you eliminate doesn't
+matter.  The larger the step size, the faster you'll have to eliminate
+violations.
 
-=item Test::Perl::Critic::Progressive::get_critic_args();
 
-=item Test::Perl::Critic::Progressive::set_critic_args(%ARGS);
+=item C< get_step_size_per_policy() >
+
+=item C< set_step_size_per_policy(%ARGS) >
+
+These functions get or set the minimum acceptable decrease in the number of
+violations of a B<specific policy> between each test.  The C<%ARGS> should be
+C<< $POLICY_NAME => $INTEGER >> pairs, like this:
+
+  my %step_sizes = (
+     'ValuesAndExpressions::ProhibitLeadingZeros'  =>  2,
+     'Variables::ProhibitConditionalDeclarations'  =>  1,
+     'InputOutput::ProhibitTwoArgOpen'             =>  3,
+  );
+
+  set_step_size_per_policy( %step_sizes );
+  progressive_critic_ok();
+
+The default step size for any given Policy is zero, which means that you are
+not required to remove any violations, but you are also not allowed to add
+any.  But if you wish to focus on eliminating certain types of violations,
+then increasing the per-policy step size will force you to B<decrease> the
+number of violations of that particular Policy, while ignoring other types of
+violations.  The larger the step size, the faster you'll have to eliminate
+violations.
+
+=item C< get_critic_args() >
+
+=item C< set_critic_args(%ARGS) >
 
 These functions get or set the arguments given to L<Perl::Critic>.  By
 default, Test::Perl::Critic::Progressive invokes Perl::Critic with its default
@@ -309,15 +412,15 @@ configuration.  But if you have developed your code against a custom
 Perl::Critic configuration, you will want to configure this test to do the
 same.
 
-Any C<%ARGS> given to the C<set_critic_args> will be passed directly into the
+Any C<%ARGS> given to C<set_critic_args> will be passed directly into the
 L<Perl::Critic> constructor.  So if you have developed your code using a
 custom F<.perlcriticrc> file, you can direct Test::Perl::Critic::Progressive
 to use a custom file too.
 
-  use Test::Perl::Critic::Progressive;
+  use Test::Perl::Critic::Progressive ( ':all' );
 
-  Test::Perl::Critic::Progressive::set_critic_args(-profile => 't/perlcriticrc);
-  Test::Perl::Critic::Progressive::progressive_critic_ok();
+  set_critic_args(-profile => 't/perlcriticrc);
+  progressive_critic_ok();
 
 Now place a copy of your own F<.perlcriticrc> file in the distribution as
 F<t/perlcriticrc>.  Now, C<progressive_critic_ok> will use this same
@@ -328,10 +431,10 @@ Any argument that is supported by the L<Perl::Critic> constructor can be
 passed through this interface.  For example, you can also set the minimum
 severity level, or include & exclude specific policies like this:
 
-  use Test::Perl::Critic::Progressive;
+  use Test::Perl::Critic::Progressive ( ':all' );
 
-  Test::Perl::Critic::Progressive::set_critic_args(-severity => 2);
-  Test::Perl::Critic::Progressive::progressive_critic_ok();
+  set_critic_args( -severity => 2, -exclude => ['MixedCaseVars'] );
+  progressive_critic_ok();
 
 See the L<Perl::Critic> documentation for complete details on its options and
 arguments.
@@ -342,15 +445,27 @@ arguments.
 
 The test is evaluated in two ways. First, the number of violations for each
 Policy must be B<less than or equal to> the number of the violations found
-during the last passing test.  Second, the total number of violations must be
-B<less than or equal> the total number of violations found during the last
-passing test (minus the step size).  This prevents you from simply
-substituting one kind of violation for another.
+during the last passing test, minus the step size B<for that Policy>.  Second,
+the total number of violations must be B<less than or equal> the total number
+of violations found during the last passing test, minus the B<total> step
+size.  This prevents you from simply substituting one kind of violation for
+another.
+
+You can use the total step size and the per-policy step size at the same time.
+For example, you can set the total step size to 5, and set the per-policy step
+size for the C<TestingAndDebugging::RequireStrictures> Policy to 3.  In which
+case, you'll have to remove 5 violations between each test, but 3 of them must
+be violations of C<TestingAndDebugging::RequireStrictures>.
 
 Over time, you'll probably add new Policies to your L<Perl::Critic> setup.
 When Test::Perl::Critic::Progressive uses a Policy for the first time, any
 newly discovered violations of that Policy will not be considered in the test.
 However, they will be considered in subsequent tests.
+
+If you are building a CPAN distribution, you'll want to add
+F<^t/.perlcritic-history$> to the F<MANIFEST.SKIP> file.  And if you are using
+a revision control system like CVS or Subversion, you'll probably want to
+configure it to ignore the F<t/.perlcritic-history> file as well.
 
 =head1 BUGS
 

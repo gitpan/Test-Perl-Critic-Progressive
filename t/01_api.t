@@ -1,14 +1,14 @@
 #######################################################################
 #      $URL: http://perlcritic.tigris.org/svn/perlcritic/trunk/Test-Perl-Critic-Progressive/t/01_api.t $
-#     $Date: 2007-06-16 23:03:15 -0700 (Sat, 16 Jun 2007) $
+#     $Date: 2007-06-22 04:26:51 -0700 (Fri, 22 Jun 2007) $
 #   $Author: thaljef $
-# $Revision: 1646 $
+# $Revision: 1698 $
 ########################################################################
 
 use strict;
 use warnings;
-use Test::More tests => 5;
-use Test::Perl::Critic::Progressive ();
+use Test::More tests => 6;
+use Test::Perl::Critic::Progressive ( ':all' );
 use English qw(-no_match_vars);
 
 #---------------------------------------------------------------------------
@@ -18,14 +18,20 @@ use English qw(-no_match_vars);
     my ($expected, $got);
 
     $expected = 10;
-    Test::Perl::Critic::Progressive::set_step_size($expected);
-    $got = Test::Perl::Critic::Progressive::get_step_size();
-    is($got, $expected, 'Accessor: set_step_size');
+    set_total_step_size($expected);
+    $got = get_total_step_size();
+    is($got, $expected, 'Accessor: set_total_step_size');
 
     $expected = 'foo/bar/baz';
-    Test::Perl::Critic::Progressive::set_history_file($expected);
-    $got = Test::Perl::Critic::Progressive::get_history_file();
+    set_history_file($expected);
+    $got = get_history_file();
     is($got, $expected, 'Accessor: set_history_file');
+
+    my %given = (Foo => 1);
+    my %expected = ('Perl::Critic::Policy::Foo' => 1);
+    set_step_size_per_policy(%given);
+    my %got = get_step_size_per_policy();
+    is_deeply(\%got, \%expected, 'Accessor: set_step_size_per_policy');
 }
 
 
