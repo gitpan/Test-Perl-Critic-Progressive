@@ -1,11 +1,13 @@
 ##############################################################################
-#      $URL: http://perlcritic.tigris.org/svn/perlcritic/trunk/Test-Perl-Critic-Progressive/lib/Test/Perl/Critic/Progressive.pm $
-#     $Date: 2007-06-22 04:26:51 -0700 (Fri, 22 Jun 2007) $
+#      $URL: http://perlcritic.tigris.org/svn/perlcritic/tags/Test-Perl-Critic-Progressive-0.03/lib/Test/Perl/Critic/Progressive.pm $
+#     $Date: 2008-07-27 16:01:56 -0700 (Sun, 27 Jul 2008) $
 #   $Author: thaljef $
-# $Revision: 1698 $
+# $Revision: 2620 $
 ##############################################################################
 
 package Test::Perl::Critic::Progressive;
+
+use 5.006001;
 
 use strict;
 use warnings;
@@ -17,7 +19,7 @@ use File::Spec qw();
 use FindBin qw($Bin);
 
 use Perl::Critic qw();
-use Perl::Critic::Utils qw( &policy_short_name &policy_long_name );
+use Perl::Critic::Utils qw(policy_short_name policy_long_name);
 
 use Test::Builder qw();
 
@@ -25,7 +27,7 @@ use base 'Exporter';
 
 #---------------------------------------------------------------------------
 
-our $VERSION = 0.02;
+our $VERSION = '0.03';
 
 #---------------------------------------------------------------------------
 
@@ -62,7 +64,11 @@ my $TEST = Test::Builder->new();
 
 sub progressive_critic_ok {
 
-    my @dirs = @_ ? @_ : _starting_points();
+    my @dirs = @_;
+    if (not @dirs) {
+        @dirs = _starting_points();
+    }
+
     my @files = _all_code_files( @dirs );
     croak qq{No perl files found\n} if not @files;
 
@@ -215,14 +221,17 @@ sub _evaluate_test {
 #---------------------------------------------------------------------------
 
 sub _all_code_files {
-    my @dirs = @_ ? @_ : _starting_points();
+    my @dirs = @_;
+    if (not @dirs) {
+        @dirs = _starting_points();
+    }
     return Perl::Critic::Utils::all_perl_files(@dirs);
 }
 
 #---------------------------------------------------------------------------
 
 sub _starting_points {
-    return -e 'blib' ? 'blib' : 'lib';
+    return -e 'blib' ? 'blib' : grep { -e $_ } qw(lib bin script scripts);
 }
 
 #---------------------------------------------------------------------------
@@ -282,7 +291,8 @@ __END__
 
 =head1 NAME
 
-Test::Perl::Critic::Progressive - Gradually enforce coding standards
+Test::Perl::Critic::Progressive - Gradually enforce coding standards.
+
 
 =head1 SYNOPSIS
 
@@ -307,6 +317,7 @@ Recommended usage for public CPAN distributions:
 
   Test::Perl::Critic::Progressive::progressive_critic_ok();
 
+
 =head1 DESCRIPTION
 
 Applying coding standards to large amounts of legacy code is a daunting task.
@@ -329,7 +340,7 @@ See the L<"NOTES"> for more details about how this test works.
 All of the following subroutines can be exported upon request.  Or you
 can export all of them at once using the C<':all'> tag.
 
-=over 8
+=over
 
 =item C< progressive_critic_ok(@FILES [, @DIRECTORIES ]) >
 
@@ -338,9 +349,10 @@ can export all of them at once using the C<':all'> tag.
 Uses Perl::Critic to analyze each of the given @FILES, and/or all Perl files
 beneath the given list of C<@DIRECTORIES>.  If no arguments are given, it
 analyzes all the Perl files in the F<blib/> directory.  If the F<blib/>
-directory does not exist, then it tries the F<lib/> directory.  The results of
-the analysis will be stored as F<.perlcritic-history> in the same directory
-where your test script is located.
+directory does not exist, then it tries the F<lib/>, F<bin/>, F<script/>, and
+F<scripts/> directory.  The results of the analysis will be stored as
+F<.perlcritic-history> in the same directory where your test script is
+located.
 
 The first time you run this test, it will always pass.  But on each subsequent
 run, the test will pass only if the number of violations found B<is less than
@@ -441,6 +453,7 @@ arguments.
 
 =back
 
+
 =head1 NOTES
 
 The test is evaluated in two ways. First, the number of violations for each
@@ -467,6 +480,7 @@ F<^t/.perlcritic-history$> to the F<MANIFEST.SKIP> file.  And if you are using
 a revision control system like CVS or Subversion, you'll probably want to
 configure it to ignore the F<t/.perlcritic-history> file as well.
 
+
 =head1 BUGS
 
 If you find any bugs, please submit them to
@@ -484,13 +498,15 @@ L<Test::Perl::Critic>
 
 L<http://www.perlcritic.com>
 
+
 =head1 AUTHOR
 
 Jeffrey Ryan Thalhammer <thaljef@cpan.org>
 
+
 =head1 COPYRIGHT
 
-Copyright (c) 2007 Jeffrey Ryan Thalhammer.  All rights reserved.
+Copyright (c) 2007-2008 Jeffrey Ryan Thalhammer.  All rights reserved.
 
 This program is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.  The full text of this license
